@@ -286,6 +286,14 @@ def test_od(beatmap):
     assert beatmap.od() == 9
 
 
+def test_background(beatmap):
+    assert beatmap.background == "miiro_no_scenario.png"
+
+
+def test_video(beatmap):
+    assert beatmap.videos == []
+
+
 def test_double_time(beatmap):
     hitobjects = beatmap.hit_objects(double_time=True)
     for hitobject in hitobjects:
@@ -342,6 +350,8 @@ def test_pack(beatmap):
         # Difficulty section fields
         'hp_drain_rate', 'circle_size', 'overall_difficulty', 'approach_rate',
         'slider_multiplier', 'slider_tick_rate',
+        # Event section fields
+        'background', 'videos',
     ]
     hitobj_attrs = [
         'position', 'time', 'new_combo', 'combo_skip', 'hitsound', 'addition'
