@@ -989,7 +989,9 @@ class HoldNote(HitObject):
     @classmethod
     def _parse(cls, position, time, hitsound, new_combo, combo_skip, rest):
         try:
-            end_time, *rest = rest
+            rests = rest[0].split(':')
+            end_time, *rests = rests
+            rest[0] = ':'.join(rests)
         except ValueError:
             raise ValueError('missing end_time')
 
@@ -1000,8 +1002,15 @@ class HoldNote(HitObject):
         if len(rest) > 1:
             raise ValueError('extra data: {rest!r}')
 
-        return cls(position, time, hitsound, end_time, new_combo, combo_skip,
-                   *rest)
+        return cls(
+            position,
+            time,
+            hitsound,
+            end_time,
+            new_combo=new_combo,
+            combo_skip=combo_skip,
+            *rest
+        )
 
     def pack(self):
         """The string representing this HoldNote hit element used in ``.osu`` file,
@@ -1991,6 +2000,7 @@ class Beatmap:
                     circles=True,
                     sliders=True,
                     spinners=True,
+                    hold_notes=True,
                     stacking=True,
                     easy=False,
                     hard_rock=False,
@@ -2007,6 +2017,8 @@ class Beatmap:
             If sliders should be included.
         spinners : bool, optional
             If spinners should be included.
+        hold_notes : bool, optional
+            If hold notes should be included.
         stacking : bool, optional
             If stacking should be calculated.
         easy : bool, optional
@@ -2071,6 +2083,8 @@ class Beatmap:
             keep_classes.append(Circle)
         if sliders:
             keep_classes.append(Slider)
+        if hold_notes:
+            keep_classes.append(HoldNote)
 
         return tuple(ob for ob in hit_objects if
                      isinstance(ob, tuple(keep_classes)))

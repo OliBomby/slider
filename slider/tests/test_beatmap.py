@@ -22,6 +22,18 @@ def test_parse_beatmap_format_v3():
     )
 
 
+def test_parse_beatmap_mania():
+    beatmap2 = slider.example_data.beatmaps.example_beatmap(
+        "L.E.D. - KAIROS IN THE SPACE TIME (Spy) [Normal].osu"
+    )
+    assert beatmap2.mode == 3
+    hit_objects_0 = beatmap2.hit_objects(stacking=False)[0]
+    assert isinstance(hit_objects_0, slider.beatmap.HoldNote)
+    assert hit_objects_0.position == Position(x=448, y=192)
+    assert hit_objects_0.time == timedelta(milliseconds=1020)
+    assert hit_objects_0.end_time == timedelta(milliseconds=2620)
+
+
 def test_version(beatmap):
     assert beatmap.format_version == 14
 
