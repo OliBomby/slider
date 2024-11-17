@@ -34,6 +34,16 @@ def test_parse_beatmap_mania():
     assert hit_objects_0.end_time == timedelta(milliseconds=2620)
 
 
+def test_parse_broken_sv():
+    beatmap2 = slider.example_data.beatmaps.example_beatmap(
+        "Ne-Yo - Stay (Feat. Peedi Peedi) (DawnII) [Rappin'].osu"
+    )
+    hit_objects_47 = beatmap2.hit_objects(stacking=False)[47]
+    assert isinstance(hit_objects_47, slider.beatmap.Slider)
+    assert hit_objects_47.time == timedelta(milliseconds=44433)
+    assert hit_objects_47.end_time == timedelta(milliseconds=44900)
+
+
 def test_version(beatmap):
     assert beatmap.format_version == 14
 

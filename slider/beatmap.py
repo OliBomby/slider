@@ -1,3 +1,4 @@
+import math
 from datetime import timedelta
 from enum import unique, IntEnum
 from functools import partial
@@ -119,6 +120,17 @@ class TimingPoint:
         if ms_per_beat < 0:
             return None
         return round(60000 / ms_per_beat)
+
+    @lazyval
+    def velocity_multiplier(self):
+        """The effective velocity multiplier of this timing point.
+
+        If this is an uninherited timing point this value will be 1.
+        """
+        if self.parent is None or self.ms_per_beat >= 0 or math.isnan(self.ms_per_beat):
+            return 1
+        else:
+            return np.clip(-100 / self.ms_per_beat, 0.1, 10)
 
     def __repr__(self):
         if self.parent is None:
@@ -882,13 +894,11 @@ class Slider(HitObject):
             tp = timing_points[0]
 
         if tp.parent is not None:
-            velocity_multiplier = np.clip(-100 / tp.ms_per_beat, 0.1, 10)
             ms_per_beat = tp.parent.ms_per_beat
         else:
-            velocity_multiplier = 1
             ms_per_beat = tp.ms_per_beat
 
-        pixels_per_beat = slider_multiplier * 100 * velocity_multiplier
+        pixels_per_beat = slider_multiplier * 100 * tp.velocity_multiplier
         num_beats = (
             (pixel_length * repeat) / pixels_per_beat
         )
