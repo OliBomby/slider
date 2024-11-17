@@ -122,12 +122,12 @@ class TimingPoint:
 
     def __repr__(self):
         if self.parent is None:
-            inherited = 'inherited '
+            uninherited = 'uninherited '
         else:
-            inherited = ''
+            uninherited = ''
         return (
             f'<{type(self).__qualname__}:'
-            f' {inherited}{self.offset.total_seconds() * 1000:g}ms>'
+            f' {uninherited}{self.offset.total_seconds() * 1000:g}ms>'
         )
 
     @classmethod
