@@ -23,7 +23,7 @@ from .utils import (
 from .curve import Curve
 
 
-def _get(cs, ix, default=no_default):
+def _get(cs, ix, default: any = no_default):
     try:
         return cs[ix]
     except IndexError:
@@ -85,7 +85,7 @@ class TimingPoint:
         """
         return type(self)(
             4 * self.offset / 3,
-            self.ms_per_beat if self.inherited else (4 * self.ms_per_beat / 3),
+            self.ms_per_beat if self.parent is not None else (4 * self.ms_per_beat / 3),
             self.meter,
             self.sample_type,
             self.sample_set,
@@ -100,7 +100,7 @@ class TimingPoint:
         """
         return type(self)(
             2 * self.offset / 3,
-            self.ms_per_beat if self.inherited else (2 * self.ms_per_beat / 3),
+            self.ms_per_beat if self.parent is not None else (2 * self.ms_per_beat / 3),
             self.meter,
             self.sample_type,
             self.sample_set,
@@ -183,37 +183,43 @@ class TimingPoint:
                 f'ms_per_beat should be a float, got {ms_per_beat!r}',
             )
 
+        meter = _get(rest, 0, '4')
         try:
-            meter = int(_get(rest, 0, '4'))
+            meter = int(meter)
         except ValueError:
             raise ValueError(f'meter should be an int, got {meter!r}')
 
+        sample_type = _get(rest, 1, '0')
         try:
-            sample_type = int(_get(rest, 1, '0'))
+            sample_type = int(sample_type)
         except ValueError:
             raise ValueError(
                 f'sample_type should be an int, got {sample_type!r}',
             )
 
+        sample_set = _get(rest, 2, '0')
         try:
-            sample_set = int(_get(rest, 2, '0'))
+            sample_set = int(sample_set)
         except ValueError:
             raise ValueError(
                 f'sample_set should be an int, got {sample_set!r}',
             )
 
+        volume = _get(rest, 3, '100')
         try:
-            volume = int(_get(rest, 3, '1'))
+            volume = int(volume)
         except ValueError:
             raise ValueError(f'volume should be an int, got {volume!r}')
 
+        inherited = _get(rest, 4, '1')
         try:
-            inherited = not bool(int(_get(rest, 4, '1')))
+            inherited = not bool(int(inherited))
         except ValueError:
             raise ValueError(f'inherited should be a bool, got {inherited!r}')
 
+        kiai_mode = _get(rest, 5, '0')
         try:
-            kiai_mode = bool(int(_get(rest, 5, '0')))
+            kiai_mode = bool(int(kiai_mode))
         except ValueError:
             raise ValueError(f'kiai_mode should be a bool, got {kiai_mode!r}')
 
@@ -509,6 +515,13 @@ class Circle(HitObject):
         combo.
     """
     type_code = 1
+
+    def __init__(
+        self, position, time, hitsound, addition='0:0:0:0:', new_combo=False,
+        combo_skip=0
+    ):
+        super().__init__(position, time, hitsound, addition, new_combo,
+                         combo_skip)
 
     @classmethod
     def _parse(cls, position, time, hitsound, new_combo, combo_skip, rest):
@@ -1047,7 +1060,7 @@ class HoldNote(HitObject):
                                    _pack_str('hitSample', self.addition)])])
 
 
-def _get_as_str(groups, section, field, default=no_default):
+def _get_as_str(groups, section, field, default: any = no_default):
     """Lookup a field from a given section.
 
     Parameters
@@ -1082,7 +1095,7 @@ def _get_as_str(groups, section, field, default=no_default):
         return default
 
 
-def _get_as_int(groups, section, field, default=no_default):
+def _get_as_int(groups, section, field, default: any = no_default):
     """Lookup a field from a given section and parse it as an integer.
 
     Parameters
@@ -1116,7 +1129,7 @@ def _get_as_int(groups, section, field, default=no_default):
         )
 
 
-def _get_as_int_list(groups, section, field, default=no_default):
+def _get_as_int_list(groups, section, field, default: any = no_default):
     """Lookup a field from a given section and parse it as an integer list.
 
     Parameters
@@ -1150,7 +1163,7 @@ def _get_as_int_list(groups, section, field, default=no_default):
         )
 
 
-def _get_as_float(groups, section, field, default=no_default):
+def _get_as_float(groups, section, field, default: any = no_default):
     """Lookup a field from a given section and parse it as an float
 
     Parameters
@@ -1184,7 +1197,7 @@ def _get_as_float(groups, section, field, default=no_default):
         )
 
 
-def _get_as_bool(groups, section, field, default=no_default):
+def _get_as_bool(groups, section, field, default: any = no_default):
     """Lookup a field from a given section and parse it as an float
 
     Parameters
@@ -1200,8 +1213,8 @@ def _get_as_bool(groups, section, field, default=no_default):
 
     Returns
     -------
-    f : float
-        ``float(groups[section][field])`` or default if ``field` is not in
+    f : bool
+        ``bool(groups[section][field])`` or default if ``field` is not in
         ``groups[section]``.
     """
     v = _get_as_str(groups, section, field, default)
@@ -1221,7 +1234,7 @@ def _get_as_bool(groups, section, field, default=no_default):
 
 
 def _invalid_to_default(field: str, field_value, expected_type,
-                        default=no_default):
+                        default: any = no_default):
     """
     Replaces the field_value with default value if it is invalid
     (missing or of incorrect type).
@@ -1260,7 +1273,7 @@ def _invalid_to_default(field: str, field_value, expected_type,
     return default
 
 
-def _pack_timedelta(field: str, td: timedelta, default=no_default):
+def _pack_timedelta(field: str, td: timedelta, default: any = no_default):
     """Pack timedelta to a string.
 
     Parameters
@@ -1286,7 +1299,7 @@ def _pack_timedelta(field: str, td: timedelta, default=no_default):
     return str(td // timedelta(milliseconds=1))
 
 
-def _pack_bool(field: str, bool_in: bool, default=no_default):
+def _pack_bool(field: str, bool_in: bool, default: any = no_default):
     """Pack bool to a string.
 
     Parameters
@@ -1312,7 +1325,7 @@ def _pack_bool(field: str, bool_in: bool, default=no_default):
     return '1' if bool_in else '0'
 
 
-def _pack_int(field: str, int_in: int, default=no_default):
+def _pack_int(field: str, int_in: int, default: any = no_default):
     """Pack int to a string.
 
     Parameters
@@ -1338,7 +1351,7 @@ def _pack_int(field: str, int_in: int, default=no_default):
     return str(int(int_in))
 
 
-def _pack_float(field: str, float_in: float or int, default=no_default):
+def _pack_float(field: str, float_in: float or int, default: any = no_default):
     """Pack float to a string. If the float number can be converted to
     int without loss, return the packed string of the converted int.
 
@@ -1368,7 +1381,7 @@ def _pack_float(field: str, float_in: float or int, default=no_default):
     return str(int_) if int_ == float_in else str(float_in)
 
 
-def _pack_str(field: str, str_in: str, default=no_default):
+def _pack_str(field: str, str_in: str, default: any = no_default):
     """Pack string to a string, with validity check.
 
     Parameters
@@ -1394,7 +1407,7 @@ def _pack_str(field: str, str_in: str, default=no_default):
     return str_in
 
 
-def _pack_int_enum(field: str, enum_in: IntEnum, default=no_default):
+def _pack_int_enum(field: str, enum_in: IntEnum, default: any = no_default):
     """Pack IntEnum to a string.
 
     Parameters
@@ -1421,7 +1434,7 @@ def _pack_int_enum(field: str, enum_in: IntEnum, default=no_default):
 
 
 def _pack_str_list(field: str, list_str: list, sep: str = ' ',
-                   default=no_default):
+                   default: any = no_default):
     """Pack a list of string to a string, with `sep` as separator
     between elements.
 
@@ -1452,7 +1465,7 @@ def _pack_str_list(field: str, list_str: list, sep: str = ' ',
 
 
 def _pack_timedelta_list(field: str, list_td: list, sep: str = ',',
-                         default=no_default):
+                         default: any = no_default):
     """Pack a list of timedelta to a string, with `sep` as separator
     between elements.
 
@@ -1569,7 +1582,7 @@ class _DifficultyHitObject:
         speed = 0
         aim = 1
 
-    def __init__(self, hit_object, radius, previous=None):
+    def __init__(self, hit_object, radius: float, previous=None):
         self.hit_object = hit_object
 
         scaling_factor = 52 / radius
@@ -2742,7 +2755,7 @@ class Beatmap:
             or are of incorrect type.
         """
         def pack_field(
-            field, field_value, pack_func, default=no_default, skip_empty=False
+            field, field_value, pack_func, default: any = no_default, skip_empty=False
         ):
             packed_field_str = pack_func(field, field_value, default=default)
             # if ``skip_empty`` is True, empty string will be
@@ -3201,6 +3214,7 @@ class Beatmap:
         )
         self._rhythm_awkwardness_cache[key] = rhythm_awkwardness
 
+    @staticmethod
     def _stars_cache_value(name, doc):
         """Create a cached function from pulling from the values generated
         in ``_calculate_stars``.
@@ -3657,6 +3671,6 @@ class Beatmap:
         ) ** (1 / 1.1) * final_multiplier
 
         if np.shape(out) == (1,):
-            out = np.asscalar(out)
+            out = out.item()
 
         return out
