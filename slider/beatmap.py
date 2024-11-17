@@ -1,4 +1,3 @@
-import math
 from datetime import timedelta
 from enum import unique, IntEnum
 from functools import partial
@@ -127,7 +126,7 @@ class TimingPoint:
 
         If this is an uninherited timing point this value will be 1.
         """
-        if self.parent is None or self.ms_per_beat >= 0 or math.isnan(self.ms_per_beat):
+        if self.parent is None or self.ms_per_beat >= 0 or np.isnan(self.ms_per_beat):
             return 1
         else:
             return np.clip(-100 / self.ms_per_beat, 0.1, 10)
