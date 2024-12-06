@@ -528,7 +528,7 @@ class Circle(HitObject):
         if len(rest) > 1:
             raise ValueError('extra data: {rest!r}')
 
-        return cls(position, time, hitsound, *rest, new_combo, combo_skip)
+        return cls(position, time, hitsound, *rest, new_combo=new_combo, combo_skip=combo_skip)
 
     def pack(self):
         """The string representing this circle hit element used in ``.osu`` file,
@@ -605,8 +605,7 @@ class Spinner(HitObject):
         if len(rest) > 1:
             raise ValueError(f'extra data: {rest!r}')
 
-        return cls(position, time, hitsound, end_time, *rest, new_combo,
-                   combo_skip)
+        return cls(position, time, hitsound, end_time, *rest, new_combo=new_combo, combo_skip=combo_skip)
 
     def pack(self):
         """The string representing this spinner hit element used in ``.osu`` file,
