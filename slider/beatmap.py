@@ -835,12 +835,12 @@ class Slider(HitObject):
                 )
 
             try:
-                x = int(x)
+                x = int(float(x))
             except ValueError:
                 raise ValueError('x should be an int, got {x!r}')
 
             try:
-                y = int(y)
+                y = int(float(y))
             except ValueError:
                 raise ValueError('y should be an int, got {y!r}')
 
