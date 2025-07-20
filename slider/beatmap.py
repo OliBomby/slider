@@ -774,7 +774,7 @@ class Slider(HitObject):
         real_duration = self.end_time - self.time
 
         ratio = legacy_duration / real_duration
-        curve_point = int(self.length * ratio)
+        curve_point = int(self.length * ratio + 1e-5)
         pos = self.curve(curve_point / self.length)
 
         tick_points[-1] = Point(pos.x, pos.y, true_end_time)
@@ -913,7 +913,7 @@ class Slider(HitObject):
         num_beats = (
             (pixel_length * repeat) / pixels_per_beat
         )
-        duration = timedelta(milliseconds=int(num_beats * ms_per_beat))
+        duration = timedelta(milliseconds=int(num_beats * ms_per_beat + 1e-5))
 
         ticks = int(
             (
@@ -921,7 +921,7 @@ class Slider(HitObject):
             ) *
             repeat +
             repeat +
-            1
+            1 + 1e-5
         )
 
         return cls(
