@@ -116,7 +116,7 @@ class TimingPoint:
         If this is an inherited timing point this value will be None.
         """
         ms_per_beat = self.ms_per_beat
-        if ms_per_beat < 0:
+        if ms_per_beat < 0 or np.isnan(ms_per_beat):
             return None
         return round(60000 / ms_per_beat)
 
