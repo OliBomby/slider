@@ -23,7 +23,7 @@ from .utils import (
 from .curve import Curve
 
 
-def _get(cs, ix, default=no_default):
+def _get(cs, ix, default: any = no_default):
     try:
         return cs[ix]
     except IndexError:
@@ -85,7 +85,7 @@ class TimingPoint:
         """
         return type(self)(
             4 * self.offset / 3,
-            self.ms_per_beat if self.inherited else (4 * self.ms_per_beat / 3),
+            self.ms_per_beat if self.parent is not None else (4 * self.ms_per_beat / 3),
             self.meter,
             self.sample_type,
             self.sample_set,
@@ -100,7 +100,7 @@ class TimingPoint:
         """
         return type(self)(
             2 * self.offset / 3,
-            self.ms_per_beat if self.inherited else (2 * self.ms_per_beat / 3),
+            self.ms_per_beat if self.parent is not None else (2 * self.ms_per_beat / 3),
             self.meter,
             self.sample_type,
             self.sample_set,
@@ -116,18 +116,29 @@ class TimingPoint:
         If this is an inherited timing point this value will be None.
         """
         ms_per_beat = self.ms_per_beat
-        if ms_per_beat < 0:
+        if ms_per_beat < 0 or np.isnan(ms_per_beat):
             return None
         return round(60000 / ms_per_beat)
 
+    @lazyval
+    def velocity_multiplier(self):
+        """The effective velocity multiplier of this timing point.
+
+        If this is an uninherited timing point this value will be 1.
+        """
+        if self.parent is None or self.ms_per_beat >= 0 or np.isnan(self.ms_per_beat):
+            return 1
+        else:
+            return np.clip(-100 / self.ms_per_beat, 0.1, 10)
+
     def __repr__(self):
         if self.parent is None:
-            inherited = 'inherited '
+            uninherited = 'uninherited '
         else:
-            inherited = ''
+            uninherited = ''
         return (
             f'<{type(self).__qualname__}:'
-            f' {inherited}{self.offset.total_seconds() * 1000:g}ms>'
+            f' {uninherited}{self.offset.total_seconds() * 1000:g}ms>'
         )
 
     @classmethod
@@ -172,37 +183,43 @@ class TimingPoint:
                 f'ms_per_beat should be a float, got {ms_per_beat!r}',
             )
 
+        meter = _get(rest, 0, '4')
         try:
-            meter = int(_get(rest, 0, '4'))
+            meter = int(meter)
         except ValueError:
             raise ValueError(f'meter should be an int, got {meter!r}')
 
+        sample_type = _get(rest, 1, '0')
         try:
-            sample_type = int(_get(rest, 1, '0'))
+            sample_type = int(sample_type)
         except ValueError:
             raise ValueError(
                 f'sample_type should be an int, got {sample_type!r}',
             )
 
+        sample_set = _get(rest, 2, '0')
         try:
-            sample_set = int(_get(rest, 2, '0'))
+            sample_set = int(sample_set)
         except ValueError:
             raise ValueError(
                 f'sample_set should be an int, got {sample_set!r}',
             )
 
+        volume = _get(rest, 3, '100')
         try:
-            volume = int(_get(rest, 3, '1'))
+            volume = int(volume)
         except ValueError:
             raise ValueError(f'volume should be an int, got {volume!r}')
 
+        inherited = _get(rest, 4, '1')
         try:
-            inherited = not bool(int(_get(rest, 4, '1')))
+            inherited = not bool(int(inherited))
         except ValueError:
             raise ValueError(f'inherited should be a bool, got {inherited!r}')
 
+        kiai_mode = _get(rest, 5, '0')
         try:
-            kiai_mode = bool(int(_get(rest, 5, '0')))
+            kiai_mode = bool(int(kiai_mode))
         except ValueError:
             raise ValueError(f'kiai_mode should be a bool, got {kiai_mode!r}')
 
@@ -499,12 +516,19 @@ class Circle(HitObject):
     """
     type_code = 1
 
+    def __init__(
+        self, position, time, hitsound, addition='0:0:0:0:', new_combo=False,
+        combo_skip=0
+    ):
+        super().__init__(position, time, hitsound, addition, new_combo,
+                         combo_skip)
+
     @classmethod
     def _parse(cls, position, time, hitsound, new_combo, combo_skip, rest):
         if len(rest) > 1:
             raise ValueError('extra data: {rest!r}')
 
-        return cls(position, time, hitsound, *rest, new_combo, combo_skip)
+        return cls(position, time, hitsound, *rest, new_combo=new_combo, combo_skip=combo_skip)
 
     def pack(self):
         """The string representing this circle hit element used in ``.osu`` file,
@@ -581,8 +605,7 @@ class Spinner(HitObject):
         if len(rest) > 1:
             raise ValueError(f'extra data: {rest!r}')
 
-        return cls(position, time, hitsound, end_time, *rest, new_combo,
-                   combo_skip)
+        return cls(position, time, hitsound, end_time, *rest, new_combo=new_combo, combo_skip=combo_skip)
 
     def pack(self):
         """The string representing this spinner hit element used in ``.osu`` file,
@@ -751,7 +774,7 @@ class Slider(HitObject):
         real_duration = self.end_time - self.time
 
         ratio = legacy_duration / real_duration
-        curve_point = int(self.length * ratio)
+        curve_point = int(self.length * ratio + 1e-5)
         pos = self.curve(curve_point / self.length)
 
         tick_points[-1] = Point(pos.x, pos.y, true_end_time)
@@ -812,12 +835,12 @@ class Slider(HitObject):
                 )
 
             try:
-                x = int(x)
+                x = int(float(x))
             except ValueError:
                 raise ValueError('x should be an int, got {x!r}')
 
             try:
-                y = int(y)
+                y = int(float(y))
             except ValueError:
                 raise ValueError('y should be an int, got {y!r}')
 
@@ -882,17 +905,15 @@ class Slider(HitObject):
             tp = timing_points[0]
 
         if tp.parent is not None:
-            velocity_multiplier = np.clip(-100 / tp.ms_per_beat, 0.1, 10)
             ms_per_beat = tp.parent.ms_per_beat
         else:
-            velocity_multiplier = 1
             ms_per_beat = tp.ms_per_beat
 
-        pixels_per_beat = slider_multiplier * 100 * velocity_multiplier
+        pixels_per_beat = slider_multiplier * 100 * tp.velocity_multiplier
         num_beats = (
             (pixel_length * repeat) / pixels_per_beat
         )
-        duration = timedelta(milliseconds=int(num_beats * ms_per_beat))
+        duration = timedelta(milliseconds=int(num_beats * ms_per_beat + 1e-5))
 
         ticks = int(
             (
@@ -900,7 +921,7 @@ class Slider(HitObject):
             ) *
             repeat +
             repeat +
-            1
+            1 + 1e-5
         )
 
         return cls(
@@ -989,7 +1010,9 @@ class HoldNote(HitObject):
     @classmethod
     def _parse(cls, position, time, hitsound, new_combo, combo_skip, rest):
         try:
-            end_time, *rest = rest
+            rests = rest[0].split(':')
+            end_time, *rests = rests
+            rest[0] = ':'.join(rests)
         except ValueError:
             raise ValueError('missing end_time')
 
@@ -1000,8 +1023,15 @@ class HoldNote(HitObject):
         if len(rest) > 1:
             raise ValueError('extra data: {rest!r}')
 
-        return cls(position, time, hitsound, end_time, new_combo, combo_skip,
-                   *rest)
+        return cls(
+            position,
+            time,
+            hitsound,
+            end_time,
+            new_combo=new_combo,
+            combo_skip=combo_skip,
+            *rest
+        )
 
     def pack(self):
         """The string representing this HoldNote hit element used in ``.osu`` file,
@@ -1029,7 +1059,7 @@ class HoldNote(HitObject):
                                    _pack_str('hitSample', self.addition)])])
 
 
-def _get_as_str(groups, section, field, default=no_default):
+def _get_as_str(groups, section, field, default: any = no_default):
     """Lookup a field from a given section.
 
     Parameters
@@ -1064,7 +1094,7 @@ def _get_as_str(groups, section, field, default=no_default):
         return default
 
 
-def _get_as_int(groups, section, field, default=no_default):
+def _get_as_int(groups, section, field, default: any = no_default):
     """Lookup a field from a given section and parse it as an integer.
 
     Parameters
@@ -1098,7 +1128,7 @@ def _get_as_int(groups, section, field, default=no_default):
         )
 
 
-def _get_as_int_list(groups, section, field, default=no_default):
+def _get_as_int_list(groups, section, field, default: any = no_default):
     """Lookup a field from a given section and parse it as an integer list.
 
     Parameters
@@ -1123,6 +1153,9 @@ def _get_as_int_list(groups, section, field, default=no_default):
     if v is default:
         return v
 
+    if not v.strip():
+        return default
+
     try:
         return [int(e.strip()) for e in v.split(',')]
     except ValueError:
@@ -1132,7 +1165,7 @@ def _get_as_int_list(groups, section, field, default=no_default):
         )
 
 
-def _get_as_float(groups, section, field, default=no_default):
+def _get_as_float(groups, section, field, default: any = no_default):
     """Lookup a field from a given section and parse it as an float
 
     Parameters
@@ -1166,7 +1199,7 @@ def _get_as_float(groups, section, field, default=no_default):
         )
 
 
-def _get_as_bool(groups, section, field, default=no_default):
+def _get_as_bool(groups, section, field, default: any = no_default):
     """Lookup a field from a given section and parse it as an float
 
     Parameters
@@ -1182,8 +1215,8 @@ def _get_as_bool(groups, section, field, default=no_default):
 
     Returns
     -------
-    f : float
-        ``float(groups[section][field])`` or default if ``field` is not in
+    f : bool
+        ``bool(groups[section][field])`` or default if ``field` is not in
         ``groups[section]``.
     """
     v = _get_as_str(groups, section, field, default)
@@ -1203,7 +1236,7 @@ def _get_as_bool(groups, section, field, default=no_default):
 
 
 def _invalid_to_default(field: str, field_value, expected_type,
-                        default=no_default):
+                        default: any = no_default):
     """
     Replaces the field_value with default value if it is invalid
     (missing or of incorrect type).
@@ -1242,7 +1275,7 @@ def _invalid_to_default(field: str, field_value, expected_type,
     return default
 
 
-def _pack_timedelta(field: str, td: timedelta, default=no_default):
+def _pack_timedelta(field: str, td: timedelta, default: any = no_default):
     """Pack timedelta to a string.
 
     Parameters
@@ -1268,7 +1301,7 @@ def _pack_timedelta(field: str, td: timedelta, default=no_default):
     return str(td // timedelta(milliseconds=1))
 
 
-def _pack_bool(field: str, bool_in: bool, default=no_default):
+def _pack_bool(field: str, bool_in: bool, default: any = no_default):
     """Pack bool to a string.
 
     Parameters
@@ -1294,7 +1327,7 @@ def _pack_bool(field: str, bool_in: bool, default=no_default):
     return '1' if bool_in else '0'
 
 
-def _pack_int(field: str, int_in: int, default=no_default):
+def _pack_int(field: str, int_in: int, default: any = no_default):
     """Pack int to a string.
 
     Parameters
@@ -1320,7 +1353,7 @@ def _pack_int(field: str, int_in: int, default=no_default):
     return str(int(int_in))
 
 
-def _pack_float(field: str, float_in: float or int, default=no_default):
+def _pack_float(field: str, float_in: float or int, default: any = no_default):
     """Pack float to a string. If the float number can be converted to
     int without loss, return the packed string of the converted int.
 
@@ -1350,7 +1383,7 @@ def _pack_float(field: str, float_in: float or int, default=no_default):
     return str(int_) if int_ == float_in else str(float_in)
 
 
-def _pack_str(field: str, str_in: str, default=no_default):
+def _pack_str(field: str, str_in: str, default: any = no_default):
     """Pack string to a string, with validity check.
 
     Parameters
@@ -1376,7 +1409,7 @@ def _pack_str(field: str, str_in: str, default=no_default):
     return str_in
 
 
-def _pack_int_enum(field: str, enum_in: IntEnum, default=no_default):
+def _pack_int_enum(field: str, enum_in: IntEnum, default: any = no_default):
     """Pack IntEnum to a string.
 
     Parameters
@@ -1403,7 +1436,7 @@ def _pack_int_enum(field: str, enum_in: IntEnum, default=no_default):
 
 
 def _pack_str_list(field: str, list_str: list, sep: str = ' ',
-                   default=no_default):
+                   default: any = no_default):
     """Pack a list of string to a string, with `sep` as separator
     between elements.
 
@@ -1434,7 +1467,7 @@ def _pack_str_list(field: str, list_str: list, sep: str = ' ',
 
 
 def _pack_timedelta_list(field: str, list_td: list, sep: str = ',',
-                         default=no_default):
+                         default: any = no_default):
     """Pack a list of timedelta to a string, with `sep` as separator
     between elements.
 
@@ -1551,7 +1584,7 @@ class _DifficultyHitObject:
         speed = 0
         aim = 1
 
-    def __init__(self, hit_object, radius, previous=None):
+    def __init__(self, hit_object, radius: float, previous=None):
         self.hit_object = hit_object
 
         scaling_factor = 52 / radius
@@ -1762,6 +1795,8 @@ class Beatmap:
                  approach_rate,
                  slider_multiplier,
                  slider_tick_rate,
+                 background,
+                 videos,
                  timing_points,
                  hit_objects):
         self.format_version = format_version
@@ -1795,6 +1830,8 @@ class Beatmap:
         self.approach_rate = approach_rate
         self.slider_multiplier = slider_multiplier
         self.slider_tick_rate = slider_tick_rate
+        self.background = background
+        self.videos = videos
         self.timing_points = timing_points
         self._hit_objects = hit_objects
         # cache hit object stacking at different ar and cs values
@@ -1987,6 +2024,7 @@ class Beatmap:
                     circles=True,
                     sliders=True,
                     spinners=True,
+                    hold_notes=True,
                     stacking=True,
                     easy=False,
                     hard_rock=False,
@@ -2003,6 +2041,8 @@ class Beatmap:
             If sliders should be included.
         spinners : bool, optional
             If spinners should be included.
+        hold_notes : bool, optional
+            If hold notes should be included.
         stacking : bool, optional
             If stacking should be calculated.
         easy : bool, optional
@@ -2067,6 +2107,8 @@ class Beatmap:
             keep_classes.append(Circle)
         if sliders:
             keep_classes.append(Slider)
+        if hold_notes:
+            keep_classes.append(HoldNote)
 
         return tuple(ob for ob in hit_objects if
                      isinstance(ob, tuple(keep_classes)))
@@ -2585,6 +2627,15 @@ class Beatmap:
             default=1.0,  # taken from wiki
         )
 
+        background = None
+        videos = []
+        if 'Events' in groups:
+            for line in groups['Events']:
+                if line.startswith('0') and background is None:  # Only the first background is used
+                    background = line.split('\"')[1]
+                elif line.startswith('Video') or line.startswith('1'):
+                    videos.append(line.split('\"')[1])
+
         return cls(
             format_version=format_version,
             audio_filename=_get_as_str(groups, 'General', 'AudioFilename'),
@@ -2674,6 +2725,8 @@ class Beatmap:
             ),
             slider_multiplier=slider_multiplier,
             slider_tick_rate=slider_tick_rate,
+            background=background,
+            videos=videos,
             timing_points=timing_points,
             hit_objects=list(map(
                 partial(
@@ -2704,7 +2757,7 @@ class Beatmap:
             or are of incorrect type.
         """
         def pack_field(
-            field, field_value, pack_func, default=no_default, skip_empty=False
+            field, field_value, pack_func, default: any = no_default, skip_empty=False
         ):
             packed_field_str = pack_func(field, field_value, default=default)
             # if ``skip_empty`` is True, empty string will be
@@ -2808,8 +2861,12 @@ class Beatmap:
 
         # pack Events section
         packed_str += '[Events]\n'
-        packed_str += '// Background and Video events\n' \
-                      '// Break Periods\n' \
+        packed_str += '// Background and Video events\n'
+        if self.background is not None:
+            packed_str += f'0,0,"{self.background}",0,0\n'
+        for video in self.videos:
+            packed_str += f'Video,0,"{video}"\n'
+        packed_str += '// Break Periods\n' \
                       '// Storyboard Layer 0(Background)\n' \
                       '// Storyboard Layer 1(Fail)\n' \
                       '// Storyboard Layer 2(Pass)\n' \
@@ -3159,6 +3216,7 @@ class Beatmap:
         )
         self._rhythm_awkwardness_cache[key] = rhythm_awkwardness
 
+    @staticmethod
     def _stars_cache_value(name, doc):
         """Create a cached function from pulling from the values generated
         in ``_calculate_stars``.
@@ -3615,6 +3673,6 @@ class Beatmap:
         ) ** (1 / 1.1) * final_multiplier
 
         if np.shape(out) == (1,):
-            out = np.asscalar(out)
+            out = out.item()
 
         return out

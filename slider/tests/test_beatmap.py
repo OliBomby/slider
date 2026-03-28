@@ -22,6 +22,28 @@ def test_parse_beatmap_format_v3():
     )
 
 
+def test_parse_beatmap_mania():
+    beatmap2 = slider.example_data.beatmaps.example_beatmap(
+        "L.E.D. - KAIROS IN THE SPACE TIME (Spy) [Normal].osu"
+    )
+    assert beatmap2.mode == 3
+    hit_objects_0 = beatmap2.hit_objects(stacking=False)[0]
+    assert isinstance(hit_objects_0, slider.beatmap.HoldNote)
+    assert hit_objects_0.position == Position(x=448, y=192)
+    assert hit_objects_0.time == timedelta(milliseconds=1020)
+    assert hit_objects_0.end_time == timedelta(milliseconds=2620)
+
+
+def test_parse_broken_sv():
+    beatmap2 = slider.example_data.beatmaps.example_beatmap(
+        "Ne-Yo - Stay (Feat. Peedi Peedi) (DawnII) [Rappin'].osu"
+    )
+    hit_objects_47 = beatmap2.hit_objects(stacking=False)[47]
+    assert isinstance(hit_objects_47, slider.beatmap.Slider)
+    assert hit_objects_47.time == timedelta(milliseconds=44433)
+    assert hit_objects_47.end_time == timedelta(milliseconds=44900)
+
+
 def test_version(beatmap):
     assert beatmap.format_version == 14
 
@@ -286,6 +308,14 @@ def test_od(beatmap):
     assert beatmap.od() == 9
 
 
+def test_background(beatmap):
+    assert beatmap.background == "miiro_no_scenario.png"
+
+
+def test_video(beatmap):
+    assert beatmap.videos == []
+
+
 def test_double_time(beatmap):
     hitobjects = beatmap.hit_objects(double_time=True)
     for hitobject in hitobjects:
@@ -342,6 +372,8 @@ def test_pack(beatmap):
         # Difficulty section fields
         'hp_drain_rate', 'circle_size', 'overall_difficulty', 'approach_rate',
         'slider_multiplier', 'slider_tick_rate',
+        # Event section fields
+        'background', 'videos',
     ]
     hitobj_attrs = [
         'position', 'time', 'new_combo', 'combo_skip', 'hitsound', 'addition'
