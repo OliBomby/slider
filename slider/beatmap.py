@@ -1153,6 +1153,9 @@ def _get_as_int_list(groups, section, field, default: any = no_default):
     if v is default:
         return v
 
+    if not v.strip():
+        return default
+
     try:
         return [int(e.strip()) for e in v.split(',')]
     except ValueError:
