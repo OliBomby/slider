@@ -441,7 +441,7 @@ class HitObject:
             raise ValueError(f'y should be an int, got {y!r}')
 
         try:
-            time = timedelta(milliseconds=int(time))
+            time = timedelta(milliseconds=int(float(time)))
         except ValueError:
             raise ValueError(f'type should be an int, got {time!r}')
 
@@ -1017,7 +1017,7 @@ class HoldNote(HitObject):
             raise ValueError('missing end_time')
 
         try:
-            end_time = timedelta(milliseconds=int(end_time))
+            end_time = timedelta(milliseconds=int(float(end_time)))
         except ValueError:
             raise ValueError(f'end_time should be an int, got {end_time!r}')
         if len(rest) > 1:

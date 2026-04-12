@@ -44,6 +44,13 @@ def test_parse_broken_sv():
     assert hit_objects_47.end_time == timedelta(milliseconds=44900)
 
 
+def test_parse_float_time():
+    slider.example_data.beatmaps.example_beatmap(
+        "25-ji, Nightcord de. x Hatsune Miku - Bad Apple!! feat. SEKAI "
+        "(Dailycare) [Luscent's Lunatic].osu"
+    )
+
+
 def test_version(beatmap):
     assert beatmap.format_version == 14
 
